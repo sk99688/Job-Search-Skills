@@ -24,7 +24,7 @@ Repeats the job-search sweep built for this user, most recently overridden on 20
 
 ## Sourcing — go beyond the 4 named platforms
 
-Don't stop at Wellfound / Arc.dev / YC / LinkedIn. Also run general web search for companies anywhere (US-HQ'd companies that hire globally are fine — the filter is about the *role's* eligibility, not the company's home country) hiring remote for these three roles (Google-style queries mixing role + "remote" + "hiring" + "worldwide"/"international", plus boards that surfaced usefully before: Himalayas, We Work Remotely, Built In, Glassdoor, ZipRecruiter, Indeed, Turing.com). Any remote opening that clears the four hard filters above is in scope, not just postings from the four named platforms.
+Don't stop at Wellfound / Arc.dev / YC / LinkedIn. Also run general web search for companies anywhere (US-HQ'd companies that hire globally are fine — the filter is about the *role's* eligibility, not the company's home country) hiring remote for these three roles (Google-style queries mixing role + "remote" + "hiring" + "worldwide"/"international", plus boards that surfaced usefully before: Himalayas, We Work Remotely, Built In, Glassdoor, ZipRecruiter, Indeed, Turing.com). Any remote opening that clears the six hard filters above is in scope, not just postings from the four named platforms.
 
 ## Resolving "company-only" results
 
@@ -33,7 +33,7 @@ YC's Work at a Startup and some LinkedIn/Google results often surface only a **c
 1. Fetch the company's actual jobs/careers page (own site) or LinkedIn Jobs tab.
 2. Pull the real open role(s) that match Full Stack / AI Engineer / Data Engineer.
 3. Apply the salary and posting-age filters to what you find there before including it.
-4. If you can't get past the company-page level (no accessible jobs list), leave it out of the main table — put it in the "Keep the pipeline full" links section instead, labeled as a company worth checking manually, not as a confirmed open role.
+4. If you can't get past the company-page level (no accessible jobs list), don't write it to Airtable at all — a company page isn't a role, and a row without a real listing pollutes the table. Collect these and mention them in the step 7 report as companies worth checking manually.
 
 ## Steps
 
@@ -50,7 +50,7 @@ YC's Work at a Startup and some LinkedIn/Google results often surface only a **c
 
 4. **De-duplicate** against what's already in the Airtable table (same company + same title = skip, unless the URL changed) — the lookup for this happens as part of step 6 below.
 
-5. **Verify each surviving URL is actually live before writing it to the file.** Run a link check on every row that made it through steps 3-4:
+5. **Verify each surviving URL is actually live before writing it to Airtable.** Run a link check on every row that made it through steps 3-4:
    `curl -s -o /dev/null -w "%{http_code}" -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36" -L --max-time 15 <url>`
    Interpret the result carefully — job platforms behave inconsistently under curl, so don't over-trust a single status code:
    - **404 / 410 / an explicit "not found" or "no longer available" response** → drop the row entirely, the listing is gone.
@@ -66,7 +66,7 @@ YC's Work at a Startup and some LinkedIn/Google results often surface only a **c
 
    Process each run:
    - `list_records` (or `search_records`) first to get current rows and build the `(Company, Title)` dedup lookup for step 4.
-   - New rows → `create_record`. If more than ~10 new rows in one run, prefer writing a small one-off Python/Node script that reads the token from `~/.claude.json` (`mcpServers.airtable.env.AIRTABLE_API_KEY`) and POSTs to Airtable's batch endpoint (`https://api.airtable.com/v0/{baseId}/{tableId}`, up to 10 records per call) rather than dozens of individual `create_record` tool calls — faster and avoids burning a large number of turns on one run. Never write the token itself into the script; always read it from the existing config.
+   - New rows → use the bundled `scripts/sync_to_airtable.py` (see "Bundled scripts" below) rather than one `create_record` call per row. It does the `(Company, Title)` dedup itself, batches 10 records per request, and reports any duplicate whose URL changed so you can follow up with `update_records`. A single `create_record` call is fine for one or two stragglers; past that the script is faster and keeps the dedup rule in one place.
    - Existing rows that changed (URL, salary, posted-date, link-check result) → `update_records` with **only** the job-data fields.
    - **Never touch `Applied`, `Status`, or `Notes` on an update** — those are the user's own tracking fields; overwriting them destroys their work.
    - A row that no longer clears the six hard filters or fails the link check → set `Link Check` to `Removed - verify`, don't delete the record (preserves the user's notes/status on it).
@@ -74,10 +74,18 @@ YC's Work at a Startup and some LinkedIn/Google results often surface only a **c
 
 7. **Report back concisely**: how many new roles found per category/platform, how many were dropped for salary/age/size/region, how many were dropped or flagged by the link check, and call out anything especially good (Worldwide or India-tagged, senior-level, disclosed salary well above $40k). Don't re-paste the whole table in chat — the Airtable base is the deliverable.
 
+## Bundled scripts
+
+- **`scripts/sync_to_airtable.py`** — takes a JSON array of candidate rows (a file path, or `-` for stdin) and writes the new ones to Airtable. It fetches every existing record first, skips anything matching an existing `(Company, Title)`, batches 10 records per request, and prints any duplicate whose `Job URL` changed along with its record id so you can follow up with `update_records`. It only ever creates, never updates — which is precisely what makes it safe to run unattended, since it structurally cannot touch the user-owned `Applied` / `Status` / `Notes` fields on existing rows. Reads the token from `~/.claude.json` (or the `AIRTABLE_API_KEY` env var); the token is never stored in the script or the repo.
+
+  ```bash
+  python3 scripts/sync_to_airtable.py candidates.json
+  ```
+
 ## Known platform quirks (learned 2026-09-18)
 
 - Wellfound's `/role/r/<role>` pages are the highest-signal source: real company size and location tags. Post dates usually require opening the individual job page.
 - Arc.dev's public remote-jobs pages skew toward staffing agencies and mid/large companies (Zillow, IBM, Capgemini, Luxoft) rather than small startups — cross-check size before including.
 - workatastartup.com won't render its listings to a plain fetch; rely on WebSearch's Links array for title+URL. Many results are "Jobs at X" company pages, not specific roles — resolve per the "company-only results" section above instead of listing the company page as-is.
-- LinkedIn search results returned via WebSearch are almost always category/aggregate pages (counts like "1,000+ roles"), not individual postings — link to them as live search starting points in the "Keep the pipeline full" section rather than fabricating specific listings. When a specific LinkedIn job URL is found, its "posted X ago" text is usually reliable for the freshness filter.
+- LinkedIn search results returned via WebSearch are almost always category/aggregate pages (counts like "1,000+ roles"), not individual postings — surface them in the step 7 report as live search starting points rather than fabricating specific listings from them. When a specific LinkedIn job URL is found, its "posted X ago" text is usually reliable for the freshness filter.
 - Company size only comes through as a real number on Wellfound/LinkedIn-style listings (bands like "51-200"). YC's workatastartup.com never exposes headcount on the list view — treat those as `Size unknown`, never assume small (or large) just because it's YC.
