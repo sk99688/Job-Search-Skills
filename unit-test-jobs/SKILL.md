@@ -48,7 +48,7 @@ YC's Work at a Startup and some LinkedIn/Google results often surface only a **c
 
 3. **Apply the six hard filters** (role match, $40k+ or undisclosed, ≤30 days old or unknown-date-flagged, not US-only/US-authorization-restricted, ≤50 employees or size-unknown-flagged, Worldwide/India only — no single-country regional roles) and the company-only resolution step above.
 
-4. **De-duplicate** against what's already in the Airtable table (same company + same title = skip, unless the URL changed) — the lookup for this happens as part of step 6 below.
+4. **De-duplicate** against what's already in the Airtable table: same company + same title = skip, unless the URL changed (a changed URL means the listing was reposted, which is an update, not a new row). You don't hand-roll this lookup — `scripts/sync_to_airtable.py` performs it in step 6, fetching every existing record and filtering the candidate set before a single write goes out. What matters at this step is that you carry `Company` and `Title` on every candidate row so the script has something to match on.
 
 5. **Verify each surviving URL is actually live before writing it to Airtable.** Run a link check on every row that made it through steps 3-4:
    `curl -s -o /dev/null -w "%{http_code}" -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36" -L --max-time 15 <url>`
@@ -64,9 +64,12 @@ YC's Work at a Startup and some LinkedIn/Google results often surface only a **c
 
    Field schema (all already created — never call `create_table` again for this base): `Title`, `Company` (single line text), `Category` (single select: Full Stack / AI Engineer / Data Engineer), `Platform` (single select: Wellfound / Work at a Startup (YC)), `Size`, `Salary`, `Posted`, `Location Scope` (single line text), `Remote Fit` (single select: Worldwide / India / Unclear), `Level`, `Job URL` (url), `Link Check` (single select: Live / Blocked - verify manually / Removed - verify), `Applied` (checkbox), `Status` (single select: New / Applied / Interviewing / Rejected / Offer), `Notes` (long text).
 
-   Process each run:
-   - `list_records` (or `search_records`) first to get current rows and build the `(Company, Title)` dedup lookup for step 4.
-   - New rows → use the bundled `scripts/sync_to_airtable.py` (see "Bundled scripts" below) rather than one `create_record` call per row. It does the `(Company, Title)` dedup itself, batches 10 records per request, and reports any duplicate whose URL changed so you can follow up with `update_records`. A single `create_record` call is fine for one or two stragglers; past that the script is faster and keeps the dedup rule in one place.
+   Process each run — the dedup check happens inside the script, before anything is written:
+   1. Write the surviving candidates from step 5 to a JSON array (a scratch file is fine), one object per role using the field names above.
+   2. Run `python3 scripts/sync_to_airtable.py <that file>`. In one pass it fetches every existing record, drops any candidate matching an existing `(Company, Title)`, and only then POSTs what's left in batches of 10. Nothing reaches the table without clearing that check, so re-running the same candidate set is harmless.
+   3. Read its output: it prints how many were skipped as duplicates, how many were created, and any duplicate whose `Job URL` changed — those are reposted listings, so follow up on each with `update_records` (job-data fields only).
+
+   A single `create_record` call is fine for one or two stragglers, but don't hand-roll the dedup for them — check against the script's fetched list rather than assuming a row is new.
    - Existing rows that changed (URL, salary, posted-date, link-check result) → `update_records` with **only** the job-data fields.
    - **Never touch `Applied`, `Status`, or `Notes` on an update** — those are the user's own tracking fields; overwriting them destroys their work.
    - A row that no longer clears the six hard filters or fails the link check → set `Link Check` to `Removed - verify`, don't delete the record (preserves the user's notes/status on it).
