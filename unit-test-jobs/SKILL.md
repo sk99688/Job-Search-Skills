@@ -40,7 +40,11 @@ Every board in this list carries equal weight. Past runs drifted into being ~80%
 
 Give each of these a real attempt every run, and record which one a row came from in `Platform`:
 
-`wellfound.com` · `arc.dev` · `workatastartup.com` (YC) · `linkedin.com` · `himalayas.app` · `weworkremotely.com` · `builtin.com`
+`wellfound.com` · `arc.dev` · `workatastartup.com` (YC) · `linkedin.com/posts/…` (see below) · `himalayas.app` · `weworkremotely.com` · `builtin.com`
+
+**LinkedIn: hiring posts only, never the Jobs board.** Source from feed posts (`linkedin.com/posts/…`) where a founder or hiring manager announces a role, not from `linkedin.com/jobs/view/…`. The reason is measured, not theoretical: on 2026-09-22 ten LinkedIn Jobs rows were added and **nine were already closed when re-checked hours later** — that board's India listings churn far too fast to be worth a row. Hiring posts also tend to state compensation in the text, which the Jobs board almost never does.
+
+Search them with queries scoped to `linkedin.com` that target post URLs and pair hiring language with a pay signal, e.g. `site:linkedin.com/posts "hiring" "remote" "full stack" "$"`, swapping in each target area and varying the pay wording (`$`, `USD`, `LPA`, `per annum`, `salary`, `compensation`). A post only earns a row when it names a real role **and** clears rule 2 on a stated figure — a "we're hiring, DM me" post with no pay and no role detail is a lead, not a row, so put it in the step 7 report instead. Set `Platform` to `LinkedIn` and put the post URL in `Job URL`.
 
 **Never source from these — excluded 2026-09-22, do not reintroduce them:**
 - `glassdoor.com` and `ziprecruiter.com` — excluded at the user's instruction. Don't write rows from them and don't cite their links.
@@ -75,19 +79,31 @@ YC's Work at a Startup and some LinkedIn/Google results often surface only a **c
 
 4. **De-duplicate** against what's already in the Airtable table: same company + same title = skip, unless the URL changed (a changed URL means the listing was reposted, which is an update, not a new row). You don't hand-roll this lookup — `scripts/sync_to_airtable.py` performs it in step 6, fetching every existing record and filtering the candidate set before a single write goes out. What matters at this step is that you carry `Company` and `Title` on every candidate row so the script has something to match on.
 
-5. **Verify each surviving URL is actually live before writing it to Airtable.** Run a link check on every row that made it through steps 3-4:
-   `curl -s -o /dev/null -w "%{http_code}" -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36" -L --max-time 15 <url>`
-   Interpret the result carefully — job platforms behave inconsistently under curl, so don't over-trust a single status code:
-   - **404 / 410 / an explicit "not found" or "no longer available" response** → drop the row entirely, the listing is gone.
-   - **200** → keep it, but this alone isn't proof the role is still open — Wellfound and YC often return 200 for a closed/expired listing because the "no longer accepting applications" state renders client-side, not server-side.
-   - **403 / 999 / timeout / connection refused** (LinkedIn in particular blocks non-browser requests like this) → do **not** treat as dead. Keep the row but tag it `Link check: blocked by platform — verify manually`. Never silently drop a real listing just because curl got refused.
-   - Run this on the final candidate set only (post-filter, post-dedup), not on every raw search result — no need to burn requests on rows that would've been dropped anyway.
+5. **Verify every surviving listing still exists and is still open**, before writing anything:
+
+   ```bash
+   python3 scripts/check_listings.py candidates.json --json > verdicts.json
+   ```
+
+   Don't hand-roll this with `curl` in the shell. A status code alone cannot tell you a role is closed — Wellfound, YC and LinkedIn all return **200** for a filled role and disclose it only in the page body, so a status-only check keeps dead roles. The script fetches the body and looks for closed/filled/expired markers as well as the status code. (It also exists because the ad-hoc shell version of this check had broken quoting, returned an empty result set, and nearly let 104 unverified rows through on 2026-09-22.)
+
+   Act on each verdict:
+   - **`live`** → write it.
+   - **`closed`** → drop it. The listing exists but the role is filled or withdrawn; a closed role is noise, and the user has asked not to see them resurface.
+   - **`dead`** (404/410) → drop it.
+   - **`blocked`** (403/406/429/timeout) → **keep it**, tagged `Link Check: Blocked - verify manually`. Bot protection is not evidence the role is gone, and silently dropping a real listing because curl got refused is the worse error.
+
+   Run it on the final candidate set only — post-filter, post-dedup — rather than on every raw search result.
+
+   Re-run it over the existing table periodically too, not just on new candidates: rows go stale in place. A pass on 2026-09-22 found 9 closed and 3 newly-404 rows that had been live when first added.
 
 6. **Write to Airtable — never the Artifact tool, never the old local HTML file.** This board lives in Airtable now (migrated 2026-09-22). Fixed IDs, don't look these up each run:
    - Base: `appNA1YixBgwXUGMY` ("Job Search Tracker")
    - Table: `tblagnwEFzc1SWwm5` ("Remote Roster")
 
-   Field schema (all already created — never call `create_table` again for this base): `Title`, `Company` (single line text), `Category` (single select: Full Stack / AI Engineer / Applied AI / Gen AI / Data Engineer), `Match` (single select: Direct / Partial (~50%) — per rule 1), `Platform` (single select: Wellfound / Work at a Startup (YC) / Arc.dev / LinkedIn / Himalayas / We Work Remotely / Built In / Other — the Glassdoor, ZipRecruiter, Indeed and Turing options still exist in Airtable from earlier runs but are retired; never write them), `Size`, `Salary`, `Posted`, `Location Scope` (single line text), `Remote Fit` (single select: Worldwide / India / Unclear), `Level`, `Job URL` (url), `Link Check` (single select: Live / Blocked - verify manually / Removed - verify), `Applied` (checkbox), `Status` (single select: New / Applied / Interviewing / Rejected / Offer), `Notes` (long text).
+   Field schema (all already created — never call `create_table` again for this base): `Title`, `Company` (single line text), `Category` (single select: Full Stack / AI Engineer / Applied AI / Gen AI / Data Engineer), `Match` (single select: Direct / Partial (~50%) — per rule 1), `Platform` (single select: Wellfound / Work at a Startup (YC) / Arc.dev / LinkedIn / Himalayas / We Work Remotely / Built In / Other — the Glassdoor, ZipRecruiter, Indeed and Turing options still exist in Airtable from earlier runs but are retired; never write them), `Size`, `Salary`, `Posted`, `Location Scope` (single line text), `Remote Fit` (single select: Worldwide / India / Unclear), `Level`, `Job URL` (url), `Company Website` (url), `Company Notes` (long text), `Link Check` (single select: Live / Blocked - verify manually / Removed - verify), `Applied` (checkbox), `Status` (single select: New / Applied / Interviewing / Rejected / Offer), `Notes` (long text).
+
+   **`Company Website` and `Company Notes` are part of every row, not optional extras.** Most job boards show a company name and nothing else, which leaves the user unable to judge whether a role is worth an application without searching the company themselves for every single row. Fill `Company Website` with the company's own domain — its actual product site, never a Wellfound/LinkedIn/Crunchbase profile — and `Company Notes` with one line on what they do plus any team-size or funding-stage signal you found. The size signal matters especially, since rule 5 caps at 50 employees and most boards don't disclose headcount, so a note like "seed-stage, ~15 people per their about page" is often the only way that rule can be applied at all. Leave `Company Website` blank rather than guessing a plausible-looking domain — a wrong link is worse than an empty one, because the user will act on it. When the "company" is a staffing agency or talent marketplace (Lemon.io, A.Team, Toptal, Proxify, Arc Exclusive and similar), say so in `Company Notes`: the end client is unknown, so neither the size rule nor the company research means what it normally would.
 
    A single-select value that doesn't exist yet isn't a problem: the sync script sends `typecast: true`, so Airtable creates the option on write. This matters because Airtable's field-update API cannot edit select choices — typecast is the only programmatic way to add one. So a new job board or a role category you haven't used before just works; don't try to pre-register it.
 
@@ -105,6 +121,12 @@ YC's Work at a Startup and some LinkedIn/Google results often surface only a **c
 7. **Report back concisely**: new roles per target area and **per board — list every board including the ones that returned zero**, since a persistent zero means that board's approach needs fixing rather than that it had nothing. Also report the Direct vs Partial (~50%) split, how many were dropped for salary/age/size/region, how many the link check dropped or flagged, and any company-only leads worth checking by hand. Call out anything especially good (Worldwide or India-tagged, senior, disclosed salary well above $40k). Don't re-paste the whole table in chat — the Airtable base is the deliverable.
 
 ## Bundled scripts
+
+- **`scripts/check_listings.py`** — takes a JSON array of URLs (or of row dicts with a `Job URL` key) and returns a verdict per listing: `live`, `closed`, `dead`, or `blocked`. It checks the response body for closed/filled/expired wording as well as the HTTP status, because every major board returns 200 for a filled role and only discloses it in the page text. Use it in step 5 on new candidates, and periodically over the whole table to catch rows that have gone stale in place.
+
+  ```bash
+  python3 scripts/check_listings.py candidates.json --json > verdicts.json
+  ```
 
 - **`scripts/sync_to_airtable.py`** — takes a JSON array of candidate rows (a file path, or `-` for stdin) and writes the new ones to Airtable. It fetches every existing record first, skips anything matching an existing `(Company, Title)`, batches 10 records per request, and prints any duplicate whose `Job URL` changed along with its record id so you can follow up with `update_records`. It only ever creates, never updates — which is precisely what makes it safe to run unattended, since it structurally cannot touch the user-owned `Applied` / `Status` / `Notes` fields on existing rows. Reads the token from `~/.claude.json` (or the `AIRTABLE_API_KEY` env var); the token is never stored in the script or the repo.
 
