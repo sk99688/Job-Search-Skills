@@ -31,7 +31,7 @@ REQUIRED = ["Title", "Company", "Category", "Platform", "Job URL", "Remote Fit",
 VALID = {
     "Category": {"Full Stack", "AI Engineer", "Applied AI", "Gen AI", "Data Engineer"},
     "Match": {"Direct", "Partial (~50%)"},
-    "Remote Fit": {"Worldwide", "India", "Unclear"},
+    "Remote Fit": {"Worldwide", "Multi-country", "Unclear"},   # "India" retired 2026-09-22
     "Platform": {"Wellfound", "Work at a Startup (YC)", "Arc.dev", "LinkedIn",
                  "Himalayas", "We Work Remotely", "Built In", "Other"},
 }
@@ -46,6 +46,8 @@ US_PLACES = (r"New York|Los Angeles|\bBoston\b|Chicago|San Francisco|Bay Area|Se
 OTHER_PLACES = (r"\bCanada\b|\bAustralia\b|\bLondon\b|\bEurope\b|LatAm|LATAM|\bMexico\b|"
                 r"\bBrazil\b|Argentina|\bGermany\b|\bBerlin\b|\bUK\b|United Kingdom|"
                 r"\bIreland\b|\bColombia\b|\bDubai\b|\bSingapore\b")
+INDIA_PLACES = (r"\bindia\b|bangalore|bengaluru|mumbai|delhi|\bpune\b|noida|indore|bhopal|"
+                r"hubli|chennai|gurgaon|hyderabad|kolkata|ahmedabad|jaipur|surat")
 WORLDWIDE = r"worldwide|anywhere in the world|remote only, everywhere|\bglobal\b|10\+ countries"
 # A timezone overlap with no place named is a working-hours constraint, not a
 # geographic one -- someone in India can meet it, so it is not a fail.
@@ -142,6 +144,15 @@ def validate(row):
     if "linkedin.com" in url and "/jobs/view" in url:
         problems.append("LinkedIn Jobs URL: source from linkedin.com/posts hiring posts instead")
 
+    # Company LinkedIn must be the company page. A personal profile or a search URL
+    # looks right at a glance and is useless (or misleading) when clicked.
+    li = str(row.get("Company LinkedIn", "")).strip()
+    if li:
+        if "/company/" not in li:
+            problems.append(f"Company LinkedIn is not a /company/ page: {li!r}")
+        elif re.search(r"/in/|/search/|/jobs/", li):
+            problems.append(f"Company LinkedIn points at a profile/search/job, not the company: {li!r}")
+
     raw_loc = str(row.get("Location Scope", ""))
     # Parenthetical notes are our own annotations ("verify not LatAm-only"), not the
     # listing's stated location. Matching them produced false FAILs on rows whose
@@ -157,10 +168,32 @@ def validate(row):
     if re.search(REGION_BOUND, loc, re.I):
         many_locations = False
 
-    # APAC contains India, so an APAC-inclusive scope is India-eligible.
-    has_india = re.search(r"\bindia\b|\bapac\b|asia[- ]pacific", loc, re.I)
+    # India-scoped listings are excluded as of 2026-09-22: the user wants international
+    # remote work, not the Indian domestic market, whose local rates rarely reach the
+    # pay floor. But India-INCLUDED is not India-ONLY -- a role open to several
+    # countries, one being India, is exactly what to keep.
+    #
+    # Deciding which is which by "is any word left after striking India out?" does not
+    # work: "Remote, Bangalore Urban" leaves the word "Urban" and looks multi-country.
+    # So ask the narrower question instead -- is any OTHER RECOGNISED PLACE named?
+    india_named = bool(re.search(INDIA_PLACES, loc, re.I))
+    without_india = re.sub(INDIA_PLACES, " ", loc, flags=re.I)
+    other_place_named = bool(
+        re.search(US_PLACES, without_india, re.I)
+        or re.search(OTHER_PLACES, without_india, re.I)
+        or re.search(r"\bapac\b|asia[- ]pacific|north america|oceania|\bjersey\b|\bgeorgia\b", without_india, re.I)
+        or many_locations
+    )
 
-    if loc and not has_india and not many_locations \
+    if india_named and not other_place_named:
+        problems.append(f"India-only scope: the user wants international remote work, not domestic: {raw_loc!r}")
+
+    # A list naming India alongside other countries is multi-country, so the US/region
+    # checks below must not then fail it for containing "United States".
+    multi_country = india_named and other_place_named
+    apac = re.search(r"\bapac\b|asia[- ]pacific", loc, re.I)
+
+    if loc and not multi_country and not apac and not many_locations \
        and not re.search(WORLDWIDE, loc, re.I) and not re.search(TZ_ONLY, loc, re.I):
         if re.search(US_PLACES, loc, re.I):
             problems.append(f"names a US location with no India eligibility: {raw_loc!r}")
