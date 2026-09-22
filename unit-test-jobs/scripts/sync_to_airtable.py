@@ -135,7 +135,14 @@ def main():
     created = 0
     url = f"{API_ROOT}/{BASE_ID}/{TABLE_ID}"
     for chunk in chunked(to_create, 10):
-        body = json.dumps({"records": [{"fields": f} for f in chunk]}).encode()
+        # typecast lets Airtable create unseen single-select options on the fly, so a
+        # role category or job board we haven't used before doesn't 422 the whole batch.
+        # Airtable's field-update API can't edit select choices, so this is the only way
+        # to add them programmatically.
+        body = json.dumps({
+            "typecast": True,
+            "records": [{"fields": f} for f in chunk],
+        }).encode()
         req = urllib.request.Request(url, data=body, method="POST", headers={
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
