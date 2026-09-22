@@ -26,7 +26,7 @@ Repeats the job-search sweep built for this user, most recently overridden on 20
 
    Judging the number:
    - A *disclosed* band or headcount is decisive. Board listings rarely show one.
-   - When a board hides it, the `Company Notes` research from step 6 is usually where the real number comes from — that research is what caught NewRocket (~490), Sticker Mule and Toptal, none of which disclosed size on their listing.
+   - When a board hides it, the `Company Notes` research (step 7) and the verifier pass (step 5b) are where the real number comes from — that research is what caught NewRocket (~490), Sticker Mule and Toptal, none of which disclosed size on their listing.
    - With no figure from either source, keep the row tagged `Size unknown — verify on listing` rather than guessing. Unknown is not the same as large.
    - Count **paid staff, not community**. Crisis Text Line reads as ~4,600 people in aggregators because that counts volunteer crisis counsellors; its actual corporate staff is 51-200, so it passes. Apply the same care to any company whose model involves a large contributor or contractor network.
 6. **No single-country / regional restriction.** Only three kinds of location clear this filter:
@@ -50,14 +50,14 @@ Give each of these a real attempt every run, and record which one a row came fro
 
 **LinkedIn: hiring posts only, never the Jobs board.** Source from feed posts (`linkedin.com/posts/…`) where a founder or hiring manager announces a role, not from `linkedin.com/jobs/view/…`. The reason is measured, not theoretical: on 2026-09-22 ten LinkedIn Jobs rows were added and **nine were already closed when re-checked hours later** — that board's India listings churn far too fast to be worth a row. Hiring posts also tend to state compensation in the text, which the Jobs board almost never does.
 
-Search them with queries scoped to `linkedin.com` that target post URLs and pair hiring language with a pay signal, e.g. `site:linkedin.com/posts "hiring" "remote" "full stack" "$"`, swapping in each target area and varying the pay wording (`$`, `USD`, `LPA`, `per annum`, `salary`, `compensation`). A post only earns a row when it names a real role **and** clears rule 2 on a stated figure — a "we're hiring, DM me" post with no pay and no role detail is a lead, not a row, so put it in the step 7 report instead. Set `Platform` to `LinkedIn` and put the post URL in `Job URL`.
+Search them with queries scoped to `linkedin.com` that target post URLs and pair hiring language with a pay signal, e.g. `site:linkedin.com/posts "hiring" "remote" "full stack" "$"`, swapping in each target area and varying the pay wording (`$`, `USD`, `LPA`, `per annum`, `salary`, `compensation`). A post only earns a row when it names a real role **and** clears rule 2 on a stated figure — a "we're hiring, DM me" post with no pay and no role detail is a lead, not a row, so put it in the step 8 report instead. Set `Platform` to `LinkedIn` and put the post URL in `Job URL`.
 
 **Never source from these — excluded 2026-09-22, do not reintroduce them:**
 - `glassdoor.com` and `ziprecruiter.com` — excluded at the user's instruction. Don't write rows from them and don't cite their links.
 - `indeed.com` — hard-blocks automated access (403 on search, 401 on individual pages), so any row from it would have to be fabricated rather than grounded.
 - `turing.com` — a talent-marketplace funnel with no discrete dated postings; its job URLs 301-redirect to generic role landing pages.
 
-Run at least one query per target area per board rather than exhausting one board before moving on, and in the step 7 report state the per-board counts — including the boards that returned nothing, since a persistent zero is a signal the approach for that board needs fixing (blocked fetch, wrong URL shape) rather than evidence it has no jobs.
+Run at least one query per target area per board rather than exhausting one board before moving on, and in the step 8 report state the per-board counts — including the boards that returned nothing, since a persistent zero is a signal the approach for that board needs fixing (blocked fetch, wrong URL shape) rather than evidence it has no jobs.
 
 Also run unrestricted web searches for companies anywhere hiring remotely for these areas (US-HQ'd companies that hire globally are fine — the filter is about the *role's* eligibility, not the company's home country), mixing role + "remote" + "hiring" + "worldwide"/"international". Anything clearing the filters is in scope regardless of which board it came from; use `Platform: Other` when it came from somewhere not in the list above.
 
@@ -68,7 +68,7 @@ YC's Work at a Startup and some LinkedIn/Google results often surface only a **c
 1. Fetch the company's actual jobs/careers page (own site) or LinkedIn Jobs tab.
 2. Pull the real open role(s) that clear rule 1 — Full Stack / AI Engineering / Applied AI / Gen AI / Data Engineering, at the ~50% threshold.
 3. Apply the salary and posting-age filters to what you find there before including it.
-4. If you can't get past the company-page level (no accessible jobs list), don't write it to Airtable at all — a company page isn't a role, and a row without a real listing pollutes the table. Collect these and mention them in the step 7 report as companies worth checking manually.
+4. If you can't get past the company-page level (no accessible jobs list), don't write it to Airtable at all — a company page isn't a role, and a row without a real listing pollutes the table. Collect these and mention them in the step 8 report as companies worth checking manually.
 
 ## Steps
 
@@ -83,9 +83,25 @@ YC's Work at a Startup and some LinkedIn/Google results often surface only a **c
 
 3. **Apply the filters**: rule 1 as a ~50% inclusion threshold (tagging `Match` Direct or Partial), then the five hard drops — $40k+ or undisclosed, ≤30 days old or unknown-date-flagged, not US-only/US-authorization-restricted, under 200 employees or size-unknown-flagged, Worldwide/India only (no single-country regional roles) — plus the company-only resolution step above.
 
-4. **De-duplicate** against what's already in the Airtable table: same company + same title = skip, unless the URL changed (a changed URL means the listing was reposted, which is an update, not a new row). You don't hand-roll this lookup — `scripts/sync_to_airtable.py` performs it in step 6, fetching every existing record and filtering the candidate set before a single write goes out. What matters at this step is that you carry `Company` and `Title` on every candidate row so the script has something to match on.
+4. **De-duplicate** against what's already in the Airtable table: same company + same title = skip, unless the URL changed (a changed URL means the listing was reposted, which is an update, not a new row). You don't hand-roll this lookup — `scripts/sync_to_airtable.py` performs it in step 7, fetching every existing record and filtering the candidate set before a single write goes out. What matters at this step is that you carry `Company` and `Title` on every candidate row so the script has something to match on.
 
-5. **Verify every surviving listing still exists and is still open**, before writing anything:
+5. **Verify the rows — a separate pass from the one that found them.** The agent that sources rows is the worst judge of whether they clear the rules: it has spent its whole run hunting for volume, every row represents its own work, and it grades its own homework. This is measured, not theoretical — on 2026-09-22 the sourcing agents each reported applying every filter, and 27 geographically-restricted rows plus 11 rows at over-cap companies reached the table anyway. So verification is a **separate stage with a different mandate**, and it runs in two parts.
+
+   **5a. Mechanical gate (deterministic, cheap):**
+   ```bash
+   python3 scripts/validate_rows.py candidates.json --strict
+   ```
+   It checks required fields, valid select values, retired boards, LinkedIn Jobs URLs, location scope and disclosed headcount, returning `FAIL` (don't write it), `RESEARCH` (can't be settled from the row alone) or `PASS`. Anything a regex can settle should be settled by a regex, so that scarce judgment effort goes only where it's actually needed. Fix every `FAIL` before going further.
+
+   **5b. Independent verifier (judgment):** hand the `RESEARCH` rows — and a random sample of the `PASS` rows, so the check isn't only ever applied to rows already suspected of being wrong — to a **fresh agent that did not do the sourcing**. Its job is to disagree, not to confirm. Brief it to:
+   - **Resolve every undisclosed headcount.** This is the main event. Rule 5 caps at 200, most boards hide size, so an unresearched row means the cap is simply unenforced. Research the company and record the number in `Company Notes`. Count paid staff, not community.
+   - **Re-derive `Category`, `Match` and `Remote Fit` from the listing itself**, without looking at what the sourcing pass tagged. A verifier that starts from the existing tag will almost always ratify it.
+   - **Re-read the location wording.** `Unclear` is only for a listing that states no location; a listing that names a place has stated one.
+   - Report per row: uphold, correct (with the corrected value), or drop (with the rule it breaks).
+
+   Apply the verifier's corrections before moving on. When the verifier and the sourcing pass disagree, the verifier wins — it has no stake in the row surviving.
+
+6. **Verify every surviving listing still exists and is still open**, before writing anything:
 
    ```bash
    python3 scripts/check_listings.py candidates.json --json > verdicts.json
@@ -103,7 +119,7 @@ YC's Work at a Startup and some LinkedIn/Google results often surface only a **c
 
    Re-run it over the existing table periodically too, not just on new candidates: rows go stale in place. A pass on 2026-09-22 found 9 closed and 3 newly-404 rows that had been live when first added.
 
-6. **Write to Airtable — never the Artifact tool, never the old local HTML file.** This board lives in Airtable now (migrated 2026-09-22). Fixed IDs, don't look these up each run:
+7. **Write to Airtable — never the Artifact tool, never the old local HTML file.** This board lives in Airtable now (migrated 2026-09-22). Fixed IDs, don't look these up each run:
    - Base: `appNA1YixBgwXUGMY` ("Job Search Tracker")
    - Table: `tblagnwEFzc1SWwm5` ("Remote Roster")
 
@@ -124,9 +140,15 @@ YC's Work at a Startup and some LinkedIn/Google results often surface only a **c
    - A row that no longer clears the filters or fails the link check → set `Link Check` to `Removed - verify`, don't delete the record (preserves the user's notes/status on it).
    - Leave `Link Check` blank on a row rather than guessing "Live" if step 5 wasn't actually run against it this pass.
 
-7. **Report back concisely**: new roles per target area and **per board — list every board including the ones that returned zero**, since a persistent zero means that board's approach needs fixing rather than that it had nothing. Also report the Direct vs Partial (~50%) split, how many were dropped for salary/age/size/region, how many the link check dropped or flagged, and any company-only leads worth checking by hand. Call out anything especially good (Worldwide or India-tagged, senior, disclosed salary well above $40k). Don't re-paste the whole table in chat — the Airtable base is the deliverable.
+8. **Report back concisely**: new roles per target area and **per board — list every board including the ones that returned zero**, since a persistent zero means that board's approach needs fixing rather than that it had nothing. Also report the Direct vs Partial (~50%) split, how many were dropped for salary/age/size/region, how many the link check dropped or flagged, and any company-only leads worth checking by hand. Call out anything especially good (Worldwide or India-tagged, senior, disclosed salary well above $40k). Don't re-paste the whole table in chat — the Airtable base is the deliverable.
 
 ## Bundled scripts
+
+- **`scripts/validate_rows.py`** — the mechanical half of step 5. Takes the candidate JSON and returns `FAIL` / `RESEARCH` / `PASS` per row, checking required fields, valid select values, retired boards, LinkedIn Jobs URLs, location scope and disclosed headcount. `--strict` exits non-zero if anything failed, so it can gate a pipeline. It deliberately does *not* try to judge whether a role is really full-stack or whether an undisclosed company is under 200 — those go to the verifier agent in 5b.
+
+  ```bash
+  python3 scripts/validate_rows.py candidates.json --strict
+  ```
 
 - **`scripts/check_listings.py`** — takes a JSON array of URLs (or of row dicts with a `Job URL` key) and returns a verdict per listing: `live`, `closed`, `dead`, or `blocked`. It checks the response body for closed/filled/expired wording as well as the HTTP status, because every major board returns 200 for a filled role and only discloses it in the page text. Use it in step 5 on new candidates, and periodically over the whole table to catch rows that have gone stale in place.
 
@@ -145,5 +167,5 @@ YC's Work at a Startup and some LinkedIn/Google results often surface only a **c
 - Wellfound's `/role/r/<role>` pages are the highest-signal source: real company size and location tags. Post dates usually require opening the individual job page.
 - Arc.dev's public remote-jobs pages skew toward staffing agencies and mid/large companies (Zillow, IBM, Capgemini, Luxoft) rather than small startups — cross-check size before including.
 - workatastartup.com won't render its listings to a plain fetch; rely on WebSearch's Links array for title+URL. Many results are "Jobs at X" company pages, not specific roles — resolve per the "company-only results" section above instead of listing the company page as-is.
-- LinkedIn search results returned via WebSearch are almost always category/aggregate pages (counts like "1,000+ roles"), not individual postings — surface them in the step 7 report as live search starting points rather than fabricating specific listings from them. When a specific LinkedIn job URL is found, its "posted X ago" text is usually reliable for the freshness filter.
+- LinkedIn: the Jobs board is retired for this skill (see sourcing), so the old advice about `/jobs/view` URLs no longer applies. For hiring posts, a `site:linkedin.com/posts` search does return real individual posts rather than aggregate pages — the useful signal is the post text itself, since that is where compensation actually appears. Posts carry no structured company-size or location field, so both must come from the post body or the verifier's research.
 - Company size only comes through as a real number on Wellfound/LinkedIn-style listings (bands like "51-200"). YC's workatastartup.com never exposes headcount on the list view — treat those as `Size unknown`, never assume small (or large) just because it's YC.
