@@ -20,10 +20,19 @@ Repeats the job-search sweep built for this user, most recently overridden on 20
 3. **Posting age: within the last 30 days.** If the platform shows a post date or "posted X ago" (LinkedIn listings usually do; individual Wellfound/Arc job pages sometimes do), drop anything older than 30 days. If no date is exposed at all (common on YC/Wellfound category pages), keep it but tag `Posted: date unknown — check listing page for freshness` rather than guessing a date. Prefer fetching the individual job page over the category page when you need the actual post date.
 4. **No US work authorization / US-only restriction.** The user is based in India and wants overseas-friendly roles, not US-tied ones. Drop any listing that:
    - explicitly requires US citizenship, a US work permit, or "must be authorized to work in the US", or
-   - is scoped only to a US location ("Remote, United States", "Remote only, US", or a specific US city like New York, San Francisco, Boston, Chicago, LA with no wider remote language).
-   When location is ambiguous/unstated, keep it tagged `Unclear — verify on listing` rather than dropping it; only drop on an explicit US-only signal.
+   - is scoped to a US location. **"Scoped to" means the listing names a US place at all** — "Remote, United States", "Remote only, US", "Onsite or remote, New York City +2", "Remote, San Francisco +1", "Onsite or remote, California +1" are all drops. A named city or state is a location constraint even when the word "only" is absent and even when "remote" appears alongside it, because a company that lists specific US offices is hiring into those offices' jurisdiction.
+   - This rule caused a real leak on 2026-09-22: 21 US-city-anchored rows were kept as `Unclear` on the reasoning that "New York City +2" wasn't an *explicit* US-only signal. That reading is wrong. If a US place is named, drop it.
 5. **Company size cap: ≤50 employees only.** Drop any listing whose company size is disclosed as more than 50 people (e.g. Wellfound/LinkedIn size bands like "51-200", "201-500", "500+"). This only applies to a *real disclosed* headcount — YC listings that never expose team size on the list view are not "large" by default; keep those but tag `Size unknown — verify small team on listing` rather than dropping or guessing a number.
-6. **No single-country / regional restriction.** Drop any listing scoped to one specific non-US country or region (e.g. "Remote only, Canada", "Remote, Europe", "Remote only, Mexico City", "Remote, LatAm", "London +1"). Only **Worldwide** (remote/everywhere, 10+ countries) and **India**-tagged roles clear this filter now — a role that used to be kept and tagged `Regional` (non-US but country/region-specific) is now dropped entirely, not just tagged. Roles with unstated/ambiguous location scope are still kept, tagged `Unclear — verify on listing`.
+6. **No single-country / regional restriction.** Only three kinds of location clear this filter:
+   - **Worldwide** — "remote, anywhere", "Anywhere in the World", or a list naming 10+ countries.
+   - **India-inclusive** — names India, an Indian city, or a country list that contains India (e.g. "Georgia, India, Jersey, Mexico, United States" is fine; the user is eligible).
+   - **Genuinely unstated** — the listing exposes no location at all. Tag `Unclear — verify on listing`.
+
+   Everything else is a drop: "Remote only, Canada", "Remote, Europe", "Remote only, Mexico City", "Remote, LatAm", "London +1", "Remote only, Australia +4".
+
+   **The critical distinction, and the one that has already gone wrong once:** `Unclear` means *no location was stated*. It does not mean *a location was stated and you weren't sure what to make of it*. A listing naming any specific city, state, or country has stated its location — if that location isn't India and isn't 10+ countries, drop it. Parking named-but-awkward locations in `Unclear` is what let 27 geographically-restricted rows into the table on 2026-09-22.
+
+   A bare timezone-overlap requirement with no place named ("Min. 4 hr overlap with Eastern Time") is not a geographic restriction — keep it as `Unclear`, since a candidate in India can in principle meet it.
 
 ## Sourcing — weight every board, don't let two dominate
 
@@ -31,7 +40,12 @@ Every board in this list carries equal weight. Past runs drifted into being ~80%
 
 Give each of these a real attempt every run, and record which one a row came from in `Platform`:
 
-`wellfound.com` · `arc.dev` · `workatastartup.com` (YC) · `linkedin.com` · `himalayas.app` · `weworkremotely.com` · `builtin.com` · `glassdoor.com` · `ziprecruiter.com` · `indeed.com` · `turing.com`
+`wellfound.com` · `arc.dev` · `workatastartup.com` (YC) · `linkedin.com` · `himalayas.app` · `weworkremotely.com` · `builtin.com`
+
+**Never source from these — excluded 2026-09-22, do not reintroduce them:**
+- `glassdoor.com` and `ziprecruiter.com` — excluded at the user's instruction. Don't write rows from them and don't cite their links.
+- `indeed.com` — hard-blocks automated access (403 on search, 401 on individual pages), so any row from it would have to be fabricated rather than grounded.
+- `turing.com` — a talent-marketplace funnel with no discrete dated postings; its job URLs 301-redirect to generic role landing pages.
 
 Run at least one query per target area per board rather than exhausting one board before moving on, and in the step 7 report state the per-board counts — including the boards that returned nothing, since a persistent zero is a signal the approach for that board needs fixing (blocked fetch, wrong URL shape) rather than evidence it has no jobs.
 
@@ -73,7 +87,7 @@ YC's Work at a Startup and some LinkedIn/Google results often surface only a **c
    - Base: `appNA1YixBgwXUGMY` ("Job Search Tracker")
    - Table: `tblagnwEFzc1SWwm5` ("Remote Roster")
 
-   Field schema (all already created — never call `create_table` again for this base): `Title`, `Company` (single line text), `Category` (single select: Full Stack / AI Engineer / Applied AI / Gen AI / Data Engineer), `Match` (single select: Direct / Partial (~50%) — per rule 1), `Platform` (single select: Wellfound / Work at a Startup (YC) / Arc.dev / LinkedIn / Himalayas / We Work Remotely / Built In / Glassdoor / ZipRecruiter / Indeed / Turing / Other), `Size`, `Salary`, `Posted`, `Location Scope` (single line text), `Remote Fit` (single select: Worldwide / India / Unclear), `Level`, `Job URL` (url), `Link Check` (single select: Live / Blocked - verify manually / Removed - verify), `Applied` (checkbox), `Status` (single select: New / Applied / Interviewing / Rejected / Offer), `Notes` (long text).
+   Field schema (all already created — never call `create_table` again for this base): `Title`, `Company` (single line text), `Category` (single select: Full Stack / AI Engineer / Applied AI / Gen AI / Data Engineer), `Match` (single select: Direct / Partial (~50%) — per rule 1), `Platform` (single select: Wellfound / Work at a Startup (YC) / Arc.dev / LinkedIn / Himalayas / We Work Remotely / Built In / Other — the Glassdoor, ZipRecruiter, Indeed and Turing options still exist in Airtable from earlier runs but are retired; never write them), `Size`, `Salary`, `Posted`, `Location Scope` (single line text), `Remote Fit` (single select: Worldwide / India / Unclear), `Level`, `Job URL` (url), `Link Check` (single select: Live / Blocked - verify manually / Removed - verify), `Applied` (checkbox), `Status` (single select: New / Applied / Interviewing / Rejected / Offer), `Notes` (long text).
 
    A single-select value that doesn't exist yet isn't a problem: the sync script sends `typecast: true`, so Airtable creates the option on write. This matters because Airtable's field-update API cannot edit select choices — typecast is the only programmatic way to add one. So a new job board or a role category you haven't used before just works; don't try to pre-register it.
 
