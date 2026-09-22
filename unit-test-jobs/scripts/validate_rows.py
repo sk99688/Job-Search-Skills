@@ -64,6 +64,65 @@ SIZE_UNKNOWN = (r"unknown|unverified|unconfirmed|disputed|conflicting|not verifi
 REGION_BOUND = r"\beurope|european|\bEEA\b|\bEU\b|\bLATAM\b|latin america|\bAPAC-only|\bnordic"
 
 
+MONTHLY_FLOOR = 4000     # USD/month
+ANNUAL_FLOOR = 48000     # USD/year, the same floor expressed annually
+INR_PER_USD = 88         # rough; only used to reject figures far below the floor
+
+# Pay that cannot be annualised honestly. Rule 2 says to annualise hourly rates,
+# but applying that to per-task or per-project gig pay manufactures a salary that
+# does not exist -- mercor was recorded as "$85/hour ≈ $176k/yr" when the listing
+# actually said $400 per accepted task at ~15hr/week.
+GIG = r"per (accepted )?(task|project|assignment|gig|milestone)|per-task|piece[- ]rate|\bbounty\b"
+
+
+def check_salary(sal):
+    """Return (verdict, detail) for a salary string against the monthly floor."""
+    s = sal.strip()
+    if not s or re.search(r"not disclosed|undisclosed|no salary|not stated", s, re.I):
+        return "OK", ""                      # rule 2 keeps undisclosed pay, tagged
+
+    if re.search(GIG, s, re.I):
+        return "RESEARCH", f"gig/per-task pay cannot be annualised into a salary: {s!r}"
+
+    if re.search(r"likely below|below \$?4?0?k|under \$?4?0?k", s, re.I):
+        return "FAIL", f"flagged below the pay floor: {s!r}"
+
+    # Monthly figures are where the floor actually bites -- a $900/month role read
+    # as "not disclosed" is how an ~$11k/yr listing passed a $40k filter once.
+    for m in re.finditer(r"(?:US)?\$\s*([\d,]+(?:\.\d+)?)\s*(?:k)?\s*(?:/|per |a )\s*(?:month|mo\b)", s, re.I):
+        val = float(m.group(1).replace(",", ""))
+        if "k" in m.group(0).lower():
+            val *= 1000
+        if val < MONTHLY_FLOOR:
+            return "FAIL", f"${val:,.0f}/month is below the ${MONTHLY_FLOOR:,}/month floor: {s!r}"
+
+    for m in re.finditer(r"(?:₹|INR|Rs\.?)\s*([\d,]+)\s*(?:k)?\s*(?:/|per |a )\s*(?:month|mo\b)", s, re.I):
+        val = float(m.group(1).replace(",", ""))
+        if "k" in m.group(0).lower():
+            val *= 1000
+        if val / INR_PER_USD < MONTHLY_FLOOR:
+            return "FAIL", f"₹{val:,.0f}/month ≈ ${val/INR_PER_USD:,.0f} is below the floor: {s!r}"
+
+    # A figure already judged as monthly must not be re-read as an annual one:
+    # "$5,000 per month" is $60k/yr and passes, but looks like a failing annual
+    # number if the period is ignored.
+    if re.search(r"(?:/|per |a )\s*(?:month|mo\b)", s, re.I):
+        return "OK", ""
+
+    # Annual figures, including ranges -- judge on the bottom of the range.
+    lows = []
+    for m in re.finditer(r"(?:US)?\$\s*([\d,]+(?:\.\d+)?)\s*(k|,000)?", s, re.I):
+        val = float(m.group(1).replace(",", ""))
+        if m.group(2):
+            val *= 1000
+        if val >= 1000:
+            lows.append(val)
+    if lows and max(lows) < ANNUAL_FLOOR and not re.search(r"/\s*(hr|hour)", s, re.I):
+        return "FAIL", f"top figure ${max(lows):,.0f} is below the ${ANNUAL_FLOOR:,}/yr floor: {s!r}"
+
+    return "OK", ""
+
+
 def validate(row):
     problems, research = [], []
 
@@ -116,9 +175,11 @@ def validate(row):
     elif not size or re.search(SIZE_UNKNOWN, size, re.I):
         research.append("headcount not disclosed — verifier must research it before this row is trusted")
 
-    sal = str(row.get("Salary", ""))
-    if re.search(r"below \$40k|under \$40k", sal, re.I):
-        research.append(f"salary flagged below the $40k floor: {sal!r}")
+    verdict, detail = check_salary(str(row.get("Salary", "")))
+    if verdict == "FAIL":
+        problems.append(detail)
+    elif verdict == "RESEARCH":
+        research.append(detail)
 
     if problems:
         return "FAIL", problems
