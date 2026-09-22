@@ -66,6 +66,18 @@ def dedup_key(fields):
     )
 
 
+def url_key(fields):
+    """Normalised Job URL, the stronger of the two dedup keys.
+
+    (Company, Title) alone misses a reposted listing whose title got reworded:
+    "Summer 2026 — Full-Stack AI Engineer Intern" and "Full-Stack AI Engineer
+    Intern — Summer 2026" are the same job at the same URL, and both reached the
+    table. A URL match is the same job by definition, so it wins outright.
+    """
+    u = (fields.get("Job URL") or "").strip().lower().rstrip("/")
+    return u.split("?")[0] or None
+
+
 def fetch_existing(token):
     """Return {(company, title): {"id", "url"}} for every record already in the table."""
     existing = {}

@@ -52,7 +52,16 @@ WORLDWIDE = r"worldwide|anywhere in the world|remote only, everywhere|\bglobal\b
 TZ_ONLY = r"^\s*(overlap with|min\.? \d+ ?hr overlap)"
 
 SIZE_OVER_CAP = r"\b(2[0-9]{2}|[3-9][0-9]{2}|[0-9]{4,})\b|201-500|500\+|1000\+|\b1k\+"
-SIZE_UNKNOWN = r"unknown|check page|not shown|n/?a|hides"
+# Any wording that means "we did not establish a headcount". Kept broad on purpose:
+# a sourcing agent wrote "Headcount unverified" and silently bypassed this gate,
+# because the phrasing is the agent's free choice while the rule is not.
+SIZE_UNKNOWN = (r"unknown|unverified|unconfirmed|disputed|conflicting|not verified|not confirmed|check page|"
+                r"not shown|not disclosed|undisclosed|n/?a|hides|tbd|\?")
+
+# A long country list that is entirely one region is regional, not worldwide. A
+# 20-country all-European list passed the "10+ countries" shortcut while offering
+# no India eligibility at all.
+REGION_BOUND = r"\beurope|european|\bEEA\b|\bEU\b|\bLATAM\b|latin america|\bAPAC-only|\bnordic"
 
 
 def validate(row):
@@ -84,6 +93,10 @@ def validate(row):
     # worldwide -- the leading country name must not make it look single-country.
     plus_n = re.search(r"\+\s*(\d+)\s*(?:more\s*)?locations?", loc, re.I)
     many_locations = bool(plus_n) and int(plus_n.group(1)) >= 9
+    # ...unless every one of those countries sits in a single region, in which case
+    # the breadth is illusory and the role is still not open to a candidate in India.
+    if re.search(REGION_BOUND, loc, re.I):
+        many_locations = False
 
     # APAC contains India, so an APAC-inclusive scope is India-eligible.
     has_india = re.search(r"\bindia\b|\bapac\b|asia[- ]pacific", loc, re.I)
@@ -95,7 +108,9 @@ def validate(row):
         elif re.search(OTHER_PLACES, loc, re.I):
             problems.append(f"single-country/regional scope: {raw_loc!r}")
 
-    size = str(row.get("Size", ""))
+    # Strip parentheticals before matching: "~170 employees (Apr 2026)" was failing
+    # as over-cap because the four-digit branch matched the YEAR, not a headcount.
+    size = re.sub(r"\([^)]*\)", "", str(row.get("Size", ""))).strip()
     if re.search(SIZE_OVER_CAP, size) and not re.search(r"1-10|11-50|51-200|[1-9][0-9]?-", size):
         problems.append(f"company at/over the 200-employee cap: {size!r}")
     elif not size or re.search(SIZE_UNKNOWN, size, re.I):
