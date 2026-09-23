@@ -58,11 +58,14 @@ A verifier that returns every list unchanged has not done its job — the finder
 6. **Write the result** into the roster's `Peer Companies` column, one peer per line:
 
    ```
-   Otter.ai — https://otter.ai — AI meeting transcription and notes
    Granola — https://granola.ai — AI notepad for meetings, seed stage
+   Fireflies — https://fireflies.ai — meeting recorder and search, ~100 people
+   CONTEXT: Otter.ai — https://otter.ai — category incumbent, well over the size cap
    ```
 
    Keep each line to name, URL, and a short clause. This column is scanned, not read.
+
+   **A `CONTEXT:` marker belongs at the start of its own line, never in a trailing note under the list.** This is not cosmetic. A verifier pass found one finder had written "all three of these are centralised incumbents" as a note *below* the peer lines — so three companies that fail the size cap scanned as ordinary leads to anyone reading line by line, which is how this column is read. A qualifier that arrives after the thing it qualifies does not work in a scanned list.
 
 ## Judgment
 
