@@ -13,3 +13,11 @@ Claude Code skills used for automating the job search — remote role sourcing, 
 ## Conventions
 
 `CONVENTIONS.md` documents the house standard followed when writing these skills — frontmatter/description rules, progressive disclosure, field-ownership rules for skills that write to shared data, and writing style.
+
+`tools/check_skill.py` enforces the mechanical half of it:
+
+```bash
+python3 tools/check_skill.py --all --strict
+```
+
+Run it before committing a skill change. It checks frontmatter, the context budget, step structure, and that every bundled script is both referenced and documented — the things that drift unnoticed once there is more than one skill to keep track of.

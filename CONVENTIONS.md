@@ -72,3 +72,20 @@ Skills with objectively verifiable output (data extraction, fixed transforms, sc
 ## 9. Description optimization (optional, do last)
 
 Once the skill's logic is settled, it's worth running the skill-creator's description-optimization loop (a handful of should-trigger / should-not-trigger test queries, iterated automatically) to sharpen triggering accuracy — but only after the body logic itself is stable. Optimizing a description around a skill that's still changing wastes the loop's iterations.
+
+## 10. Enforcing this document
+
+Conventions drift silently. One skill stays in line because you can read it; five do not, and the failure is invisible — a skill that has outgrown its context budget or lost its trigger phrases still *works*, it just works worse, and nobody connects the bad run back to the file.
+
+`tools/check_skill.py` checks what can be settled mechanically:
+
+```bash
+python3 tools/check_skill.py --all          # every skill in the repo
+python3 tools/check_skill.py --all --strict # non-zero exit on any FAIL
+```
+
+It verifies the frontmatter (`name` present, kebab-case, matching the folder; `description` present and actually stating a trigger condition), the body against the 500-line budget, the presence of a `## Steps` section, that every bundled script is referenced from SKILL.md and carries a docstring explaining why it exists, and that long reference files have a contents list.
+
+It deliberately does not judge whether a rule is well-reasoned or a description well-targeted. Those need a reader. Run it before committing a skill change; treat a FAIL as blocking and a warn as a question worth answering.
+
+**On the line budget specifically:** do not split a skill merely to get under it. Accumulated reasoning — why a rule exists, what went wrong when it didn't — is load-bearing, and moving it into `references/` puts it behind a file the model may not open. Split when the body is genuinely approaching the budget, and split the *detail* while leaving a one-clause reason inline with each rule, so the rule keeps its teeth.
