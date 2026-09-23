@@ -19,11 +19,20 @@ A peer solves the **same problem for the same kind of customer**. Not merely the
 
 Aim for **3-5 peers**. Fewer than three usually means the space was read too narrowly; more than five means it was read too broadly and the list has stopped being useful.
 
-## Match the stage, not just the space
+## Size rule: peers must be small — under 50 people. No MNCs, no corporates.
 
-A seed-stage startup's real peers are other small companies, not the incumbent it positions against. Salesforce is not a useful peer for a four-person CRM startup: it will not be hiring the same roles, the work is nothing alike, and it fails the roster's own under-200-employee rule anyway.
+A peer earns its place by being somewhere the user could plausibly apply and get the same kind of role. A large company fails that on every count: different hiring process, different work, different odds, and it would not clear the roster's own size rule either. So the bar is a hard one — **under 50 employees** — and it is deliberately tighter than the roster's under-200 cap, because a peer is a speculative lead the user has to spend effort investigating, while a roster row is a role already in hand.
 
-Prefer companies of broadly similar size and maturity. When a large incumbent genuinely defines the category, name it but mark it clearly, so the user can see at a glance that it is context rather than a lead.
+Excluded outright, with no exceptions:
+- **Multinationals and large corporates** — Salesforce, Microsoft, Oracle, Accenture, Infosys, TCS, Wipro and their peers.
+- **Category-defining platforms**, however relevant they look: Otter.ai for notetakers, Bright Data and Apify for scraping, Veeva and Clarivate for life-sciences software, Bullhorn for recruiting tooling.
+- **Large established nonprofits** — the size rule is about headcount, not about being commercial.
+
+**There is no "context" exemption.** An earlier version of this skill let incumbents through tagged `CONTEXT`, on the theory that they oriented the user even if they were not leads. That was removed on 2026-09-24: in a column that gets scanned rather than read, a qualifier is easy to miss, and the cost of a missed one is the user spending time on a company that was never applicable. If a company is over 50 people, leave it out. The user can find the market leader in a space without help.
+
+When exclusions leave you with two peers, record two. `Few direct peers found — niche space` remains a legitimate and useful result; inventing a fifth by reaching for a household name is not.
+
+**Record a size or stage signal on every peer line** — "seed", "YC W24", "~20 people", "founded 2024". Without one the size rule cannot be checked by anyone downstream, and `scripts/validate_peers.py` will flag the line as unverifiable. A peer whose size you genuinely cannot establish is a weaker lead than one you can, and should be the first to go when trimming.
 
 ## When the "company" is not a company
 
@@ -42,7 +51,7 @@ The single verifier is about something else, and it is the part that matters. Th
 **Brief the verifier to delete, not to research.** This is the opposite of the verifier in the job-roster skill, whose job was to *resolve* unknown facts. Here almost everything unknown is already excluded; what remains is a list that is too long and too generous. For every peer it should ask:
 
 1. **Same problem, same customer — or just same technology?** The test is whether this company would plausibly hire the same engineer for the same work. "Both use LLMs" fails. Cut it.
-2. **Same stage?** An incumbent thousands strong is not a peer of a seed-stage startup, whatever the category page says. Keep it only if it was explicitly marked as category context.
+2. **Under 50 people?** An incumbent is not a peer of a seed-stage startup whatever the category page says, and there is no context exemption — cut it. Where the line carries no size signal at all, the size rule cannot be checked, so treat that as a weakness rather than a pass.
 3. **Does the site actually load, and is the company alive?** A parked domain or a site last touched in 2019 is not a lead.
 4. **Is the link the company's own product site**, rather than a Crunchbase/LinkedIn/directory page?
 
@@ -59,13 +68,14 @@ A verifier that returns every list unchanged has not done its job — the finder
 
    ```
    Granola — https://granola.ai — AI notepad for meetings, seed stage
-   Fireflies — https://fireflies.ai — meeting recorder and search, ~100 people
-   CONTEXT: Otter.ai — https://otter.ai — category incumbent, well over the size cap
+   Circleback — https://circleback.ai — AI meeting notes and action items, YC-backed, ~15 people
    ```
 
    Keep each line to name, URL, and a short clause. This column is scanned, not read.
 
-   **A `CONTEXT:` marker belongs at the start of its own line, never in a trailing note under the list.** This is not cosmetic. A verifier pass found one finder had written "all three of these are centralised incumbents" as a note *below* the peer lines — so three companies that fail the size cap scanned as ordinary leads to anyone reading line by line, which is how this column is read. A qualifier that arrives after the thing it qualifies does not work in a scanned list.
+   Every line carries a size or stage signal, as the size rule above requires. Note how both examples do: "seed stage", "~15 people".
+
+   The reason there is no marker for "big but relevant" is worth keeping in mind — an earlier version had one, and a finder wrote the qualifier as a trailing note *below* the list, so three over-cap companies scanned as ordinary leads. A qualifier that arrives after the thing it qualifies does not work in a column that gets scanned. Excluding outright removes the failure mode rather than formatting around it.
 
 ## Judgment
 
