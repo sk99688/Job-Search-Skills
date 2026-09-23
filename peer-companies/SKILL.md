@@ -1,0 +1,69 @@
+---
+name: peer-companies
+description: Maps the competitive landscape around a company — finds startups working in the same problem space with a similar product idea, and records their websites. Make sure to use this whenever the user names a company and asks who else is in that space, who the competitors or alternatives are, what the market map looks like, or wants to widen a search from one company to the companies adjacent to it, even if they don't use the word "competitor". Also runs over the Remote Roster table to populate its Peer Companies column.
+---
+
+# Peer companies
+
+Given a company, find the other startups solving the same problem, and record where to find them.
+
+The reason this exists is narrower than general market research, and it shapes every judgment below: a company worth applying to is a strong signal that **its competitors are worth applying to as well**. They build the same things, need the same skills, sit at a similar stage, and are frequently hiring the same roles at the same moment — often without ever appearing on the job boards the roster is built from. One interesting company is really a pointer to five.
+
+## What counts as a peer
+
+A peer solves the **same problem for the same kind of customer**. Not merely the same technology, and not merely the same industry.
+
+- Peers of an AI meeting-notetaker are other meeting-notetakers — not "other companies using LLMs", which is most of them now and tells the user nothing.
+- Peers of a healthcare-claims automation startup are other claims-automation startups, not hospital software generally.
+- Shared tech stack is not kinship. "Also builds with React" is noise.
+
+Aim for **3-5 peers**. Fewer than three usually means the space was read too narrowly; more than five means it was read too broadly and the list has stopped being useful.
+
+## Match the stage, not just the space
+
+A seed-stage startup's real peers are other small companies, not the incumbent it positions against. Salesforce is not a useful peer for a four-person CRM startup: it will not be hiring the same roles, the work is nothing alike, and it fails the roster's own under-200-employee rule anyway.
+
+Prefer companies of broadly similar size and maturity. When a large incumbent genuinely defines the category, name it but mark it clearly, so the user can see at a glance that it is context rather than a lead.
+
+## When the "company" is not a company
+
+Several roster rows are staffing agencies, talent marketplaces or brokered listings — Arc Exclusive, Lemon.io, A.Team, Proxify, Clera. These have no product space to map, and their competitors are other agencies, which is useless for this purpose.
+
+Record `No product space — <agency/marketplace>, peers would be other agencies` and move on. Do not invent a landscape for them.
+
+## Run it as three agents: two finders, one verifier
+
+Split the company list in half between **two finder agents** working in parallel, then pass everything they produce to **one verifier agent that did no finding**.
+
+Two finders is about throughput — the work is per-company and embarrassingly parallel, so splitting it halves the wall-clock without either agent needing to know what the other is doing.
+
+The single verifier is about something else, and it is the part that matters. The characteristic failure of this skill is **padding with false kinship**: an agent asked for 3-5 peers will produce 3-5 peers, and when a space is genuinely thin it starts reaching — "also an AI company" quietly becomes a peer. The finder cannot catch this, because by the time the row exists it has already persuaded itself. A reader who did none of the finding, asked one blunt question, catches it immediately.
+
+**Brief the verifier to delete, not to research.** This is the opposite of the verifier in the job-roster skill, whose job was to *resolve* unknown facts. Here almost everything unknown is already excluded; what remains is a list that is too long and too generous. For every peer it should ask:
+
+1. **Same problem, same customer — or just same technology?** The test is whether this company would plausibly hire the same engineer for the same work. "Both use LLMs" fails. Cut it.
+2. **Same stage?** An incumbent thousands strong is not a peer of a seed-stage startup, whatever the category page says. Keep it only if it was explicitly marked as category context.
+3. **Does the site actually load, and is the company alive?** A parked domain or a site last touched in 2019 is not a lead.
+4. **Is the link the company's own product site**, rather than a Crunchbase/LinkedIn/directory page?
+
+A verifier that returns every list unchanged has not done its job — the finders are generous by construction, so some cutting is the expected outcome, not a sign something went wrong. Equally, a verifier should not invent replacements for what it cuts: a three-peer list that survives scrutiny beats a five-peer list that does not.
+
+## Steps
+
+1. **Establish what the company actually does.** Read its own website first — its homepage headline is usually a better description of the space than any third-party summary. The roster's `Company Notes` gives a starting point but is often one line.
+2. **Find peers.** Search for the problem in the company's own words ("AI meeting notes", "GST billing for SMEs"), plus alternatives-style queries ("X alternatives", "competitors to X", "like X for Y"). YC's directory is useful when the company is YC-backed, since batchmates cluster by space.
+3. **Get each peer's own website.** Its product domain, never a Crunchbase, LinkedIn, or directory listing — the user wants to look at the product and find its careers page.
+4. **Verify the peer is real and current.** A dead startup is not a lead. Fetch the site; if it 404s, parks, or has clearly been abandoned, drop it.
+5. **Run the verifier pass** described above over everything both finders produced, and apply its cuts before anything is written.
+6. **Write the result** into the roster's `Peer Companies` column, one peer per line:
+
+   ```
+   Otter.ai — https://otter.ai — AI meeting transcription and notes
+   Granola — https://granola.ai — AI notepad for meetings, seed stage
+   ```
+
+   Keep each line to name, URL, and a short clause. This column is scanned, not read.
+
+## Judgment
+
+Leave a peer out rather than pad the list. A wrong or stale link costs the user a click and some trust; a list of four real peers is worth more than eight where half are noise. When a space genuinely has few comparable startups, say so — `Few direct peers found — niche space` is a real and useful finding, not a failure.
