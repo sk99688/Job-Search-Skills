@@ -14,7 +14,9 @@ broken quoting and returned an empty result set, which nearly let 104 unchecked
 rows through on 2026-09-22.
 
 Verdicts:
-    live     -- 200 and no closed-marker found in the body
+    live     -- 200, no closed-marker, and no on-page age past the freshness window
+    stale    -- reachable and not closed, but the page dates itself a year or more
+                back. Treat as failing rule 3 rather than as a live lead.
     closed   -- body contains a closed/filled/expired marker (drop it)
     dead     -- 404/410 (drop it)
     blocked  -- 403/406/429/timeout: bot protection, NOT evidence the role is gone.
@@ -48,6 +50,14 @@ CLOSED_MARKERS = [
 ]
 CLOSED_RE = re.compile("|".join(CLOSED_MARKERS), re.I)
 
+# A listing can be open, reachable, and years old. Viaduct's page showed
+# "4 years ago" while returning a clean 200 with no closed wording at all --
+# status codes and closed-markers both miss staleness entirely, so age has to be
+# read off the page like the salary is.
+STALE_RE = re.compile(
+    r"\b(?:posted|updated|published)?\s*(\d+)\+?\s*(year|yr)s?\s*ago\b"
+    r"|\b(1[2-9]|[2-9]\d)\+?\s*months?\s*ago\b", re.I)
+
 
 def check(url):
     try:
@@ -70,6 +80,9 @@ def check(url):
     m = CLOSED_RE.search(body)
     if m:
         return url, "closed", m.group(0)[:60]
+    a = STALE_RE.search(body)
+    if a:
+        return url, "stale", f"page says {a.group(0).strip()!r}"
     return url, "live", status
 
 
